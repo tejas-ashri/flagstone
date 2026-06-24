@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: flagstone_dev
+      POSTGRES_USER: flagstone
+      POSTGRES_PASSWORD: flagstone
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flagstone"]
+      interval: 5s
+      retries: 5
+
+  api:
+    build: .
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      DATABASE_URL: postgresql+asyncpg://flagstone:flagstone@db:5432/flagstone_dev
+      SDK_KEY: sdk-dev-key
+    ports: ["8000:8000"]
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes: [".:/app"]
+
+volumes:
+  pgdata:
