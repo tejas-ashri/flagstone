@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.sse_manager import SSEConnectionManager
 from backend.deps import get_db, get_sse_manager
-from backend.services import flag_service
+from backend.schemas.event import EventBatch
+from backend.services import analytics_service, flag_service
 
 router = APIRouter(prefix="/sdk", tags=["sdk"])
 
@@ -54,3 +55,13 @@ async def sse_stream(
             await manager.unsubscribe("*", queue)
 
     return EventSourceResponse(event_generator())
+
+
+@router.post("/events", status_code=202)
+async def ingest_events(
+    batch: EventBatch,
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(_verify_sdk_key),
+):
+    await analytics_service.insert_events(db, batch.events)
+    return {"accepted": len(batch.events)}
