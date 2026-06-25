@@ -1,7 +1,9 @@
 import respx
 import httpx
 import threading
+from pathlib import Path
 from sdk.client import FlagClient
+from sdk.disk_cache import DiskCache
 
 FLAG_CONFIG = {
     "flags": {
@@ -109,3 +111,45 @@ def test_close_cancels_flush_timer():
     client.close()
     # Timer should be cancelled (not alive)
     assert not timer.is_alive()
+
+
+def test_disk_cache_write_and_read(tmp_path):
+    cache = DiskCache(str(tmp_path / "cache.json"))
+    config = {"flags": {"my-flag": {"key": "my-flag", "enabled": True, "variations": [False, True], "default_variation": 1, "rules": [], "rollout": None}}}
+    cache.write(config)
+    result = cache.read()
+    assert result == config
+
+
+def test_disk_cache_returns_none_when_missing(tmp_path):
+    cache = DiskCache(str(tmp_path / "cache.json"))
+    assert cache.read() is None
+
+
+def test_disk_cache_returns_none_on_corrupt_file(tmp_path):
+    p = tmp_path / "cache.json"
+    p.write_text("not json")
+    cache = DiskCache(str(p))
+    assert cache.read() is None
+
+
+@respx.mock
+def test_client_falls_back_to_disk_cache(tmp_path):
+    config = {"flags": {"my-flag": {"key": "my-flag", "enabled": True, "variations": [False, True], "default_variation": 1, "rules": [], "rollout": None}}}
+    cache = DiskCache(str(tmp_path / "cache.json"))
+    cache.write(config)
+    respx.get("http://localhost:8000/sdk/config").mock(side_effect=httpx.ConnectError("unreachable"))
+    client = FlagClient("sdk-key", cache_path=str(tmp_path / "cache.json"), poll_interval=9999)
+    assert client.is_enabled("my-flag", {"id": "u1"}) is True
+    client.close()
+
+
+@respx.mock
+def test_client_writes_cache_on_successful_fetch(tmp_path):
+    config = {"flags": {}}
+    respx.get("http://localhost:8000/sdk/config").mock(return_value=httpx.Response(200, json=config))
+    cache_path = str(tmp_path / "cache.json")
+    client = FlagClient("sdk-key", cache_path=cache_path, poll_interval=9999)
+    cache = DiskCache(cache_path)
+    assert cache.read() == config
+    client.close()

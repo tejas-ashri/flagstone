@@ -2,6 +2,7 @@ import threading
 
 import httpx
 
+from sdk.disk_cache import DiskCache
 from sdk.evaluator import evaluate
 from sdk.poller import Poller
 from sdk.stream_listener import StreamListener
@@ -14,6 +15,7 @@ class FlagClient:
         base_url: str = "http://localhost:8000",
         poll_interval: int = 30,
         use_sse: bool = False,
+        cache_path: str | None = "~/.flagstone_cache.json",
         flush_interval: int = 10,
     ) -> None:
         self._sdk_key = sdk_key
@@ -24,10 +26,15 @@ class FlagClient:
         self._event_buffer: list[dict] = []
         self._flush_lock = threading.Lock()
         self._flush_interval = flush_interval
+        self._cache = DiskCache(cache_path) if cache_path else None
         try:
             self._refresh()
         except Exception:
-            pass
+            if self._cache:
+                cached = self._cache.read()
+                if cached:
+                    with self._lock:
+                        self._flags = cached.get("flags", {})
         if use_sse:
             self._listener = StreamListener(
                 url=f"{self._base_url}/sdk/stream",
@@ -105,6 +112,8 @@ class FlagClient:
         config = resp.json()
         with self._lock:
             self._flags = config.get("flags", {})
+        if self._cache:
+            self._cache.write(config)
 
     def _on_sse_update(self, event: dict) -> None:
         key = event.get("key")
