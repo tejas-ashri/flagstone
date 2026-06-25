@@ -50,8 +50,8 @@ async def update_flag(db: AsyncSession, key: str, data: FlagUpdate) -> FlagRespo
         flag.variations = data.variations
     if "default_variation" in fields and data.default_variation is not None:
         flag.default_variation = data.default_variation
-    if "rules" in fields and data.rules is not None:
-        flag.rules = [r.model_dump() for r in data.rules]
+    if "rules" in fields:
+        flag.rules = [r.model_dump() for r in data.rules] if data.rules is not None else []
     if "rollout" in fields:
         # Explicitly set (even to None) — allows clearing rollout
         flag.rollout = data.rollout.model_dump() if data.rollout else None
