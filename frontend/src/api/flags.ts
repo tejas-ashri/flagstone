@@ -4,6 +4,7 @@ const BASE = "/api";
 
 export async function listFlags(): Promise<FlagResponse[]> {
   const r = await fetch(`${BASE}/flags`);
+  if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
