@@ -1,7 +1,6 @@
 import respx
 import httpx
 import threading
-from pathlib import Path
 from sdk.client import FlagClient
 from sdk.disk_cache import DiskCache
 
