@@ -39,5 +39,6 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-q"
 
-[tool.setuptools]
-packages = ["backend", "sdk"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["backend*", "sdk*"]
