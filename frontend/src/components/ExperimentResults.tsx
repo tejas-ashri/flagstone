@@ -5,7 +5,7 @@ import { getExperimentResults } from "../api/analytics";
 export function ExperimentResults({ flagKey }: { flagKey: string }) {
   const [data, setData] = useState<Results | null>(null);
   useEffect(() => {
-    getExperimentResults(flagKey).then(setData);
+    getExperimentResults(flagKey).then(setData).catch(console.error);
   }, [flagKey]);
   if (!data) return <p>Loading...</p>;
   if (!data.variations.length) return <p>No experiment data yet.</p>;

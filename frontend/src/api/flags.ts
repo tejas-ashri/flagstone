@@ -28,5 +28,6 @@ export async function updateFlag(key: string, data: Partial<FlagResponse>): Prom
 }
 
 export async function deleteFlag(key: string): Promise<void> {
-  await fetch(`${BASE}/flags/${key}`, { method: "DELETE" });
+  const r = await fetch(`${BASE}/flags/${key}`, { method: "DELETE" });
+  if (!r.ok) throw new Error(`Failed to delete flag: ${r.status}`);
 }

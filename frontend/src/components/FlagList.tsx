@@ -4,9 +4,10 @@ import { updateFlag, deleteFlag } from "../api/flags";
 interface Props {
   flags: FlagResponse[];
   onRefresh: () => void;
+  onSelect?: (key: string) => void;
 }
 
-export function FlagList({ flags, onRefresh }: Props) {
+export function FlagList({ flags, onRefresh, onSelect }: Props) {
   const toggle = async (flag: FlagResponse) => {
     await updateFlag(flag.key, { enabled: !flag.enabled });
     onRefresh();
@@ -38,6 +39,7 @@ export function FlagList({ flags, onRefresh }: Props) {
             <td style={{ padding: "8px" }}>{f.variations.length} variations</td>
             <td style={{ padding: "8px" }}>{new Date(f.updated_at).toLocaleString()}</td>
             <td style={{ padding: "8px" }}>
+              <button onClick={() => onSelect?.(f.key)} style={{ color: "#3b82f6", background: "none", border: "none", cursor: "pointer", marginRight: 8 }}>Results</button>
               <button onClick={() => remove(f.key)} style={{ color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>Delete</button>
             </td>
           </tr>
