@@ -48,12 +48,12 @@ class FlagClient:
         self._schedule_flush()
 
     def is_enabled(self, flag_key: str, user: dict) -> bool:
-        variation_index = self.get_variation(flag_key, user)
-        self._buffer_event("exposure", flag_key, variation_index, user)
         with self._lock:
             flag = self._flags.get(flag_key)
         if flag is None:
             return False
+        variation_index = evaluate(flag, user)
+        self._buffer_event("exposure", flag_key, variation_index, user)
         return bool(flag["variations"][variation_index])
 
     def get_variation(self, flag_key: str, user: dict) -> int:
@@ -116,15 +116,13 @@ class FlagClient:
             self._cache.write(config)
 
     def _on_sse_update(self, event: dict) -> None:
-        key = event.get("key")
         if event.get("event") == "deleted":
+            key = event.get("key")
             if key:
                 with self._lock:
                     self._flags.pop(key, None)
-        elif key and "flag" in event:
-            with self._lock:
-                self._flags[key] = event["flag"]
         else:
+            # SSE is a change-signal; fetch updated config
             try:
                 self._refresh()
             except Exception:

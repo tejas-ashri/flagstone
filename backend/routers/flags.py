@@ -28,7 +28,10 @@ async def create_flag(
     sse: SSEConnectionManager = Depends(get_sse_manager),
 ):
     flag = await flag_service.create_flag(db, data)
-    await sse.broadcast(flag.key, json.dumps({"event": "created", "key": flag.key}))
+    try:
+        await sse.broadcast(flag.key, json.dumps({"event": "created", "key": flag.key}))
+    except Exception:
+        pass
     return flag
 
 
@@ -40,7 +43,10 @@ async def update_flag(
     sse: SSEConnectionManager = Depends(get_sse_manager),
 ):
     flag = await flag_service.update_flag(db, key, data)
-    await sse.broadcast(flag.key, json.dumps({"event": "updated", "key": flag.key}))
+    try:
+        await sse.broadcast(flag.key, json.dumps({"event": "updated", "key": flag.key}))
+    except Exception:
+        pass
     return flag
 
 
@@ -51,4 +57,7 @@ async def delete_flag(
     sse: SSEConnectionManager = Depends(get_sse_manager),
 ):
     await flag_service.delete_flag(db, key)
-    await sse.broadcast(key, json.dumps({"event": "deleted", "key": key}))
+    try:
+        await sse.broadcast(key, json.dumps({"event": "deleted", "key": key}))
+    except Exception:
+        pass

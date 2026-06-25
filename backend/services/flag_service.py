@@ -43,16 +43,18 @@ async def update_flag(db: AsyncSession, key: str, data: FlagUpdate) -> FlagRespo
     flag = await db.get(Flag, key)
     if flag is None:
         raise HTTPException(status_code=404, detail=f"Flag '{key}' not found")
-    if data.enabled is not None:
+    fields = data.model_fields_set
+    if "enabled" in fields and data.enabled is not None:
         flag.enabled = data.enabled
-    if data.variations is not None:
+    if "variations" in fields and data.variations is not None:
         flag.variations = data.variations
-    if data.default_variation is not None:
+    if "default_variation" in fields and data.default_variation is not None:
         flag.default_variation = data.default_variation
-    if data.rules is not None:
+    if "rules" in fields and data.rules is not None:
         flag.rules = [r.model_dump() for r in data.rules]
-    if data.rollout is not None:
-        flag.rollout = data.rollout.model_dump()
+    if "rollout" in fields:
+        # Explicitly set (even to None) — allows clearing rollout
+        flag.rollout = data.rollout.model_dump() if data.rollout else None
     flag.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(flag)
