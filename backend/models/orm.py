@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Boolean, Integer, DateTime, func, JSON
+from sqlalchemy import ForeignKey, String, Boolean, Integer, DateTime, func, JSON
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -24,7 +24,7 @@ class Flag(Base):
 class FeatureEvent(Base):
     __tablename__ = "events"
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    flag_key: Mapped[str] = mapped_column(String, index=True)
+    flag_key: Mapped[str] = mapped_column(String, ForeignKey("flags.key", ondelete="CASCADE"), index=True)
     event_type: Mapped[str] = mapped_column(String)  # 'exposure' | 'conversion'
     variation_index: Mapped[int] = mapped_column(Integer)
     user_id: Mapped[str] = mapped_column(String)

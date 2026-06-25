@@ -14,8 +14,9 @@ router = APIRouter(prefix="/sdk", tags=["sdk"])
 
 
 async def _verify_sdk_key(x_sdk_key: str = Header(...)):
+    # v1: single static key from config. The sdk_keys table exists for v2
+    # revocable keys but is not yet wired — all clients share one key.
     from backend.config import get_settings
-
     if x_sdk_key != get_settings().sdk_key:
         raise HTTPException(status_code=401, detail="Invalid SDK key")
     return x_sdk_key
@@ -47,7 +48,7 @@ async def sse_stream(
                 if await request.is_disconnected():
                     break
                 try:
-                    data = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    data = await asyncio.wait_for(queue.get(), timeout=15.0)
                     yield {"event": "flag_updated", "data": data}
                 except asyncio.TimeoutError:
                     yield {"event": "ping", "data": ""}
