@@ -26,12 +26,11 @@ class FlagClient:
         self._poller.start()
 
     def is_enabled(self, flag_key: str, user: dict) -> bool:
-        variation_index = self.get_variation(flag_key, user)
         with self._lock:
             flag = self._flags.get(flag_key)
         if flag is None:
             return False
-        return bool(flag["variations"][variation_index])
+        return bool(flag["variations"][evaluate(flag, user)])
 
     def get_variation(self, flag_key: str, user: dict) -> int:
         with self._lock:
