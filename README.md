@@ -61,7 +61,7 @@ flagstone/
 └── README.md                  Project documentation
 ```
 
-## Client Onboarding
+## Onboarding Process
 
 ### Prerequisites
 
