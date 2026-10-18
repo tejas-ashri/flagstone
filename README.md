@@ -199,19 +199,8 @@ uvicorn backend.main:app --reload
 cd frontend && npm run dev
 ```
 
-## Configuration
-
-Flagstone reads configuration from environment variables or a local `.env` file.
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `DATABASE_URL` | `postgresql+asyncpg://flagstone:flagstone@localhost:5432/flagstone_dev` | Database connection string. |
-| `SDK_KEY` | `sdk-dev-key` | Shared SDK authentication key for client requests. |
-| `POLL_INTERVAL_SECONDS` | `30` | Default polling interval used by backend settings. |
-
 ## Notes
 
-- The current SDK key implementation uses one shared static key from configuration.
 - The database includes an `sdk_keys` table for future revocable SDK key support.
 - Event batches are capped at 1,000 records per request.
 
