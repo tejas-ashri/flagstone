@@ -8,23 +8,35 @@ from backend.models.orm import Flag
 from backend.schemas.flag import FlagCreate, FlagResponse, FlagUpdate
 
 
-async def list_flags(db: AsyncSession) -> list[FlagResponse]:
-    result = await db.execute(select(Flag).order_by(Flag.key))
+async def _load(db: AsyncSession, project_id: str, key: str) -> Flag:
+    flag = await db.get(Flag, {"project_id": project_id, "key": key})
+    if flag is None:
+        raise HTTPException(status_code=404, detail=f"Flag '{key}' not found")
+    return flag
+
+
+async def list_flags(db: AsyncSession, project_id: str) -> list[FlagResponse]:
+    result = await db.execute(
+        select(Flag).where(Flag.project_id == project_id).order_by(Flag.key)
+    )
     return [FlagResponse.model_validate(f) for f in result.scalars()]
 
 
-async def get_flag(db: AsyncSession, key: str) -> FlagResponse:
-    flag = await db.get(Flag, key)
-    if flag is None:
-        raise HTTPException(status_code=404, detail=f"Flag '{key}' not found")
-    return FlagResponse.model_validate(flag)
+async def flag_keys(db: AsyncSession, project_id: str) -> set[str]:
+    result = await db.execute(select(Flag.key).where(Flag.project_id == project_id))
+    return set(result.scalars())
 
 
-async def create_flag(db: AsyncSession, data: FlagCreate) -> FlagResponse:
-    existing = await db.get(Flag, data.key)
+async def get_flag(db: AsyncSession, project_id: str, key: str) -> FlagResponse:
+    return FlagResponse.model_validate(await _load(db, project_id, key))
+
+
+async def create_flag(db: AsyncSession, project_id: str, data: FlagCreate) -> FlagResponse:
+    existing = await db.get(Flag, {"project_id": project_id, "key": data.key})
     if existing:
         raise HTTPException(status_code=409, detail=f"Flag '{data.key}' already exists")
     flag = Flag(
+        project_id=project_id,
         key=data.key,
         enabled=data.enabled,
         variations=data.variations,
@@ -39,10 +51,10 @@ async def create_flag(db: AsyncSession, data: FlagCreate) -> FlagResponse:
     return FlagResponse.model_validate(flag)
 
 
-async def update_flag(db: AsyncSession, key: str, data: FlagUpdate) -> FlagResponse:
-    flag = await db.get(Flag, key)
-    if flag is None:
-        raise HTTPException(status_code=404, detail=f"Flag '{key}' not found")
+async def update_flag(
+    db: AsyncSession, project_id: str, key: str, data: FlagUpdate
+) -> FlagResponse:
+    flag = await _load(db, project_id, key)
     fields = data.model_fields_set
     if "enabled" in fields and data.enabled is not None:
         flag.enabled = data.enabled
@@ -61,9 +73,7 @@ async def update_flag(db: AsyncSession, key: str, data: FlagUpdate) -> FlagRespo
     return FlagResponse.model_validate(flag)
 
 
-async def delete_flag(db: AsyncSession, key: str) -> None:
-    flag = await db.get(Flag, key)
-    if flag is None:
-        raise HTTPException(status_code=404, detail=f"Flag '{key}' not found")
+async def delete_flag(db: AsyncSession, project_id: str, key: str) -> None:
+    flag = await _load(db, project_id, key)
     await db.delete(flag)
     await db.commit()

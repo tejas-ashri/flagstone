@@ -7,12 +7,13 @@ from backend.models.orm import FeatureEvent
 from backend.schemas.event import EventRecord, ExperimentResults, VariationResult
 
 
-async def insert_events(db: AsyncSession, events: list[EventRecord]) -> None:
+async def insert_events(db: AsyncSession, project_id: str, events: list[EventRecord]) -> None:
     if not events:
         return
     now = datetime.now(timezone.utc)
     rows = [
         FeatureEvent(
+            project_id=project_id,
             flag_key=e.flag_key,
             event_type=e.event_type,
             variation_index=e.variation_index,
@@ -26,7 +27,9 @@ async def insert_events(db: AsyncSession, events: list[EventRecord]) -> None:
     await db.commit()
 
 
-async def get_experiment_results(db: AsyncSession, flag_key: str) -> ExperimentResults:
+async def get_experiment_results(
+    db: AsyncSession, project_id: str, flag_key: str
+) -> ExperimentResults:
     result = await db.execute(
         text("""
             SELECT
@@ -34,11 +37,11 @@ async def get_experiment_results(db: AsyncSession, flag_key: str) -> ExperimentR
                 COUNT(*) FILTER (WHERE event_type = 'exposure')  AS exposures,
                 COUNT(*) FILTER (WHERE event_type = 'conversion') AS conversions
             FROM events
-            WHERE flag_key = :key
+            WHERE project_id = :project AND flag_key = :key
             GROUP BY variation_index
             ORDER BY variation_index
         """),
-        {"key": flag_key},
+        {"project": project_id, "key": flag_key},
     )
     rows = result.fetchall()
     variations = []

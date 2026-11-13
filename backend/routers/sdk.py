@@ -2,32 +2,35 @@ import asyncio
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from sse_starlette.sse import EventSourceResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sse_starlette.sse import EventSourceResponse
 
 from backend.db.sse_manager import SSEConnectionManager
 from backend.deps import get_db, get_sse_manager
+from backend.routers.flags import project_channel
 from backend.schemas.event import EventBatch
-from backend.services import analytics_service, flag_service
+from backend.services import analytics_service, flag_service, sdk_key_service
 
 router = APIRouter(prefix="/sdk", tags=["sdk"])
 
 
-async def _verify_sdk_key(x_sdk_key: str = Header(...)):
-    # v1: single static key from config. The sdk_keys table exists for v2
-    # revocable keys but is not yet wired — all clients share one key.
-    from backend.config import get_settings
-    if x_sdk_key != get_settings().sdk_key:
+async def _verify_sdk_key(
+    x_sdk_key: str = Header(...), db: AsyncSession = Depends(get_db)
+) -> str:
+    """Returns the project the key belongs to. An SDK key only ever sees and
+    writes data of its own project."""
+    key = await sdk_key_service.resolve_key(db, x_sdk_key)
+    if key is None:
         raise HTTPException(status_code=401, detail="Invalid SDK key")
-    return x_sdk_key
+    return key.project_id
 
 
 @router.get("/config")
 async def sdk_config(
     db: AsyncSession = Depends(get_db),
-    _: str = Depends(_verify_sdk_key),
+    project_id: str = Depends(_verify_sdk_key),
 ):
-    flags = await flag_service.list_flags(db)
+    flags = await flag_service.list_flags(db, project_id)
     return {
         "flags": {f.key: f.model_dump() for f in flags},
         "fetched_at": datetime.now(timezone.utc).isoformat(),
@@ -38,9 +41,10 @@ async def sdk_config(
 async def sse_stream(
     request: Request,
     manager: SSEConnectionManager = Depends(get_sse_manager),
-    _: str = Depends(_verify_sdk_key),
+    project_id: str = Depends(_verify_sdk_key),
 ):
-    queue = await manager.subscribe("*")
+    channel = project_channel(project_id)
+    queue = await manager.subscribe(channel)
 
     async def event_generator():
         try:
@@ -53,7 +57,7 @@ async def sse_stream(
                 except asyncio.TimeoutError:
                     yield {"event": "ping", "data": ""}
         finally:
-            await manager.unsubscribe("*", queue)
+            await manager.unsubscribe(channel, queue)
 
     return EventSourceResponse(event_generator())
 
@@ -62,7 +66,11 @@ async def sse_stream(
 async def ingest_events(
     batch: EventBatch,
     db: AsyncSession = Depends(get_db),
-    _: str = Depends(_verify_sdk_key),
+    project_id: str = Depends(_verify_sdk_key),
 ):
-    await analytics_service.insert_events(db, batch.events)
-    return {"accepted": len(batch.events)}
+    # Events for flags outside this key's project (or deleted flags) are
+    # dropped rather than failing the whole batch.
+    known = await flag_service.flag_keys(db, project_id)
+    accepted = [e for e in batch.events if e.flag_key in known]
+    await analytics_service.insert_events(db, project_id, accepted)
+    return {"accepted": len(accepted), "rejected": len(batch.events) - len(accepted)}
