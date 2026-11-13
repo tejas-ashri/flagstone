@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { useBlocker } from "react-router-dom";
 import { updateFlag } from "../api/flags";
 import { messageOf } from "../api/http";
+import { useFlag } from "../flag/context";
+import { useProject } from "../project/context";
+import { ConfirmDialog } from "./Modal";
+import { useToast } from "./toast/context";
 import {
   OPERATORS,
   buildUpdate,
@@ -12,34 +17,35 @@ import {
   type RuleDraft,
 } from "../lib/draft";
 import { parseValue, valueType } from "../lib/values";
-import type { FlagResponse, RuleOperator } from "../types/flag";
+import type { RuleOperator } from "../types/flag";
 
-interface Props {
-  flag: FlagResponse;
-  onSaved: (flag: FlagResponse) => void;
-  onDirtyChange: (dirty: boolean) => void;
-}
-
-export function FlagEditor({ flag, onSaved, onDirtyChange }: Props) {
+export function FlagEditor() {
+  const { flag, setFlag } = useFlag();
+  const { project, isAdmin } = useProject();
+  const toast = useToast();
   const [draft, setDraft] = useState<FlagDraft>(() => draftFromFlag(flag));
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   const dirty = useMemo(
     () => fingerprint(draft) !== fingerprint(draftFromFlag(flag)),
     [draft, flag],
   );
 
+  // Leaving the page (another tab, another flag, a link) with unsaved edits
+  // asks first; so does closing or reloading the browser tab.
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) => dirty && currentLocation.pathname !== nextLocation.pathname,
+  );
   useEffect(() => {
-    onDirtyChange(dirty);
-    return () => onDirtyChange(false);
-  }, [dirty, onDirtyChange]);
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
-  const change = (next: FlagDraft) => {
-    setDraft(next);
-    setSavedAt(null);
-  };
+  const change = (next: FlagDraft) => setDraft(next);
 
   const variationOptions = draft.variations.map((v, i) => (
     <option key={v.id} value={i}>{i}: {v.text.trim() || "(empty)"}</option>
@@ -49,10 +55,11 @@ export function FlagEditor({ flag, onSaved, onDirtyChange }: Props) {
   const setRule = (id: number, patch: Partial<RuleDraft>) =>
     change({ ...draft, rules: draft.rules.map(r => (r.id === id ? { ...r, ...patch } : r)) });
 
-  const moveRule = (index: number, delta: number) => {
+  const moveRule = (from: number, to: number) => {
+    if (from === to) return;
     const rules = [...draft.rules];
-    const [rule] = rules.splice(index, 1);
-    rules.splice(index + delta, 0, rule);
+    const [rule] = rules.splice(from, 1);
+    rules.splice(to, 0, rule);
     change({ ...draft, rules });
   };
 
@@ -62,10 +69,10 @@ export function FlagEditor({ flag, onSaved, onDirtyChange }: Props) {
     if (!payload) return;
     setSaving(true);
     try {
-      const updated = await updateFlag(flag.key, payload);
+      const updated = await updateFlag(project.id, flag.key, payload);
       setDraft(draftFromFlag(updated));
-      setSavedAt(Date.now());
-      onSaved(updated);
+      setFlag(updated);
+      toast("Saved. Connected SDKs pick this up on their next refresh.", { kind: "success" });
     } catch (err) {
       setErrors([messageOf(err)]);
     } finally {
@@ -82,7 +89,8 @@ export function FlagEditor({ flag, onSaved, onDirtyChange }: Props) {
   const pctValid = Number.isFinite(pct) && pct >= 0 && pct <= 100;
 
   return (
-    <div className="editor">
+    // A disabled fieldset makes every control inside read-only for viewers.
+    <fieldset className="editor" disabled={!isAdmin}>
       {!flag.enabled && (
         <p className="notice">
           This flag is off, so every user gets the default variation. Rules and rollout apply once it is turned on.
@@ -146,7 +154,31 @@ export function FlagEditor({ flag, onSaved, onDirtyChange }: Props) {
           {draft.rules.map((r, i) => {
             const op = OPERATORS.find(o => o.value === r.operator)!;
             return (
-              <div className="rule" key={r.id}>
+              <div
+                className={`rule${dragIndex === i ? " dragging" : ""}`}
+                key={r.id}
+                onDragOver={e => {
+                  if (dragIndex === null) return;
+                  e.preventDefault();
+                  if (dragIndex !== i) {
+                    moveRule(dragIndex, i);
+                    setDragIndex(i);
+                  }
+                }}
+              >
+                <span
+                  className="drag-handle"
+                  draggable={isAdmin}
+                  title="Drag to reorder"
+                  aria-hidden
+                  onDragStart={e => {
+                    setDragIndex(i);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragEnd={() => setDragIndex(null)}
+                >
+                  ⋮⋮
+                </span>
                 <span className="index">{i + 1}</span>
                 <div className="rule-fields">
                   <span className="muted">If</span>
@@ -180,8 +212,8 @@ export function FlagEditor({ flag, onSaved, onDirtyChange }: Props) {
                   </select>
                 </div>
                 <div className="rule-actions">
-                  <button type="button" className="btn ghost" title="Move up" aria-label={`Move rule ${i + 1} up`} disabled={i === 0} onClick={() => moveRule(i, -1)}>↑</button>
-                  <button type="button" className="btn ghost" title="Move down" aria-label={`Move rule ${i + 1} down`} disabled={i === draft.rules.length - 1} onClick={() => moveRule(i, 1)}>↓</button>
+                  <button type="button" className="btn ghost" title="Move up" aria-label={`Move rule ${i + 1} up`} disabled={i === 0} onClick={() => moveRule(i, i - 1)}>↑</button>
+                  <button type="button" className="btn ghost" title="Move down" aria-label={`Move rule ${i + 1} down`} disabled={i === draft.rules.length - 1} onClick={() => moveRule(i, i + 1)}>↓</button>
                   <button type="button" className="btn ghost danger" onClick={() => change({ ...draft, rules: draft.rules.filter(x => x.id !== r.id) })}>Remove</button>
                 </div>
               </div>
@@ -280,22 +312,32 @@ export function FlagEditor({ flag, onSaved, onDirtyChange }: Props) {
         </select>
       </section>
 
-      <footer className="save-bar">
-        {errors.length > 0 && (
-          <ul className="error-text" role="alert">
-            {errors.map(e => <li key={e}>{e}</li>)}
-          </ul>
-        )}
-        <div className="row">
-          <button type="button" className="btn primary" disabled={!dirty || saving} onClick={save}>
-            {saving ? "Saving…" : "Save changes"}
-          </button>
-          <button type="button" className="btn" disabled={!dirty || saving} onClick={discard}>Discard</button>
-          <span className="muted small" aria-live="polite">
-            {dirty ? "Unsaved changes" : savedAt ? "Saved. Connected SDKs pick this up on their next refresh." : ""}
-          </span>
-        </div>
-      </footer>
-    </div>
+      {isAdmin && (
+        <footer className={`save-bar${dirty ? " dirty" : ""}`}>
+          {errors.length > 0 && (
+            <ul className="error-text" role="alert">
+              {errors.map(e => <li key={e}>{e}</li>)}
+            </ul>
+          )}
+          <div className="row">
+            <button type="button" className="btn primary" disabled={!dirty || saving} onClick={save}>
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+            <button type="button" className="btn" disabled={!dirty || saving} onClick={discard}>Discard</button>
+            <span className="muted small" aria-live="polite">{dirty ? "Unsaved changes" : "All changes saved"}</span>
+          </div>
+        </footer>
+      )}
+
+      <ConfirmDialog
+        open={blocker.state === "blocked"}
+        title="Discard unsaved changes?"
+        message="Your edits to this flag's targeting haven't been saved."
+        confirmLabel="Discard changes"
+        danger
+        onConfirm={() => blocker.proceed?.()}
+        onCancel={() => blocker.reset?.()}
+      />
+    </fieldset>
   );
 }

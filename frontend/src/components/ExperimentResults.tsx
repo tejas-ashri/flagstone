@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { getExperimentResults } from "../api/analytics";
 import { messageOf } from "../api/http";
+import { useFlag } from "../flag/context";
 import { formatValue } from "../lib/values";
+import { useProject } from "../project/context";
 import type { FlagResponse, VariationResult } from "../types/flag";
 
 function rows(flag: FlagResponse, results: VariationResult[]): VariationResult[] {
@@ -22,26 +24,39 @@ function lift(rate: number | null, baseline: number | null): string {
   return `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
 }
 
-export function ExperimentResults({ flag }: { flag: FlagResponse }) {
+const AUTO_REFRESH_MS = 10_000;
+
+export function ExperimentResults() {
+  const { flag } = useFlag();
+  const { project } = useProject();
   const [results, setResults] = useState<VariationResult[] | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [auto, setAuto] = useState(false);
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const flagKey = flag.key;
 
   const load = useCallback(() => {
     setLoading(true);
-    return getExperimentResults(flagKey)
+    return getExperimentResults(project.id, flagKey)
       .then(d => {
         setResults(d.variations);
         setError("");
+        setLoadedAt(new Date());
       })
       .catch(err => setError(messageOf(err)))
       .finally(() => setLoading(false));
-  }, [flagKey]);
+  }, [project.id, flagKey]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!auto) return;
+    const id = setInterval(load, AUTO_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [auto, load]);
 
   if (error && !results) {
     return (
@@ -69,10 +84,17 @@ export function ExperimentResults({ flag }: { flag: FlagResponse }) {
             your app calls <code>track_conversion</code>.
           </p>
         </div>
-        <button type="button" className="btn" onClick={load} disabled={loading}>
-          {loading ? "Refreshing…" : "Refresh"}
-        </button>
+        <div className="row wrap">
+          <label className="check small">
+            <input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)} />
+            Auto-refresh
+          </label>
+          <button type="button" className="btn" onClick={load} disabled={loading}>
+            {loading ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
       </header>
+      {loadedAt && <p className="muted small">Last updated {loadedAt.toLocaleTimeString()}</p>}
       {error && <p className="error-text" role="alert">{error}</p>}
       {total === 0 ? (
         <p className="muted">No events yet. They appear here once an SDK client starts evaluating this flag.</p>

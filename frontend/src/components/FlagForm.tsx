@@ -4,6 +4,7 @@ import { messageOf } from "../api/http";
 import type { FlagResponse } from "../types/flag";
 
 interface Props {
+  projectId: string;
   onCreated: (flag: FlagResponse) => void;
   onCancel: () => void;
 }
@@ -18,7 +19,7 @@ type Kind = keyof typeof KINDS;
 // Keys end up in URL paths and in SDK calls, so keep them to a safe charset.
 const KEY_PATTERN = "[A-Za-z0-9][A-Za-z0-9._\\-]*";
 
-export function FlagForm({ onCreated, onCancel }: Props) {
+export function FlagForm({ projectId, onCreated, onCancel }: Props) {
   const [key, setKey] = useState("");
   const [kind, setKind] = useState<Kind>("boolean");
   const [enabled, setEnabled] = useState(false);
@@ -30,7 +31,7 @@ export function FlagForm({ onCreated, onCancel }: Props) {
     setError("");
     setBusy(true);
     try {
-      const flag = await createFlag({
+      const flag = await createFlag(projectId, {
         key: key.trim(),
         enabled,
         variations: [...KINDS[kind].variations],
@@ -47,7 +48,7 @@ export function FlagForm({ onCreated, onCancel }: Props) {
   };
 
   return (
-    <form onSubmit={submit} className="create-form">
+    <form onSubmit={submit} className="stack">
       <label className="field">
         <span>Flag key</span>
         <input
@@ -60,6 +61,7 @@ export function FlagForm({ onCreated, onCancel }: Props) {
           maxLength={100}
           required
         />
+        <span className="muted small">Your code refers to the flag by this key. It can't be changed later.</span>
       </label>
       <label className="field">
         <span>Type</span>
@@ -74,11 +76,11 @@ export function FlagForm({ onCreated, onCancel }: Props) {
         Turn on immediately
       </label>
       {error && <p className="error-text" role="alert">{error}</p>}
-      <div className="row">
+      <div className="modal-footer">
+        <button type="button" className="btn" onClick={onCancel}>Cancel</button>
         <button type="submit" className="btn primary" disabled={busy}>
           {busy ? "Creating…" : "Create flag"}
         </button>
-        <button type="button" className="btn" onClick={onCancel}>Cancel</button>
       </div>
     </form>
   );

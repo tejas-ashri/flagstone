@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backend.config import Settings
@@ -31,5 +32,11 @@ async def ensure_defaults(db: AsyncSession, settings: Settings) -> None:
 
 
 async def run_bootstrap(factory: async_sessionmaker[AsyncSession], settings: Settings) -> None:
-    async with factory() as db:
-        await ensure_defaults(db, settings)
+    try:
+        async with factory() as db:
+            await ensure_defaults(db, settings)
+    except DBAPIError as e:
+        raise RuntimeError(
+            "Could not prepare the database. If the schema is missing or outdated, "
+            "run `alembic upgrade head` and start the API again."
+        ) from e

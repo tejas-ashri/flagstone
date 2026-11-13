@@ -33,6 +33,15 @@ export interface VariationResult {
   conversion_rate_pct: number | null;
 }
 
+export interface EvaluateResult {
+  variation_index: number;
+  value: unknown;
+  reason: "disabled" | "rule" | "rollout" | "outside_rollout" | "default";
+  rule_index: number | null;
+  bucket: number | null;
+  rollout_percentage: number | null;
+}
+
 export interface ExperimentResults {
   flag_key: string;
   variations: VariationResult[];

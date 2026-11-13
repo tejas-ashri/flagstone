@@ -14,10 +14,16 @@ services:
 
   api:
     build: .
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    # Migrations run first: the API seeds the Default project's SDK key on startup.
+    command: sh -c "alembic upgrade head && uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+    # OAuth credentials go in .env, which the API reads from the mounted repo.
     environment:
       DATABASE_URL: postgresql+asyncpg://flagstone:flagstone@db:5432/flagstone_dev
       SDK_KEY: sdk-dev-key
+      PUBLIC_URL: http://localhost:5173
+      # Local development only: passwordless sign-in, and the first admin.
+      DEV_LOGIN: "true"
+      ADMIN_EMAILS: admin@example.com
     ports: ["8000:8000"]
     depends_on:
       db:
