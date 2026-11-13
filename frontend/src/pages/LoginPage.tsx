@@ -3,9 +3,8 @@ import { Navigate, useSearchParams } from "react-router-dom";
 import { messageOf } from "../api/http";
 import { devLogin, getProviders } from "../api/projects";
 import { useAuth } from "../auth/context";
+import { ProviderLogo } from "../components/ProviderLogo";
 import { useLoad } from "../lib/useLoad";
-
-const ICONS: Record<string, string> = { github: "GH", google: "G", slack: "S" };
 
 function safeNext(next: string | null): string {
   return next && next.startsWith("/") && !next.startsWith("//") ? next : "/projects";
@@ -60,7 +59,7 @@ export function LoginPage() {
               className={`btn provider ${p.id}`}
               href={`/auth/${p.id}/login?next=${encodeURIComponent(next)}`}
             >
-              <span className="provider-icon" aria-hidden>{ICONS[p.id] ?? "•"}</span>
+              <ProviderLogo provider={p.id} />
               Continue with {p.label}
             </a>
           ))}
