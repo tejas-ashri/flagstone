@@ -7,6 +7,7 @@ depends_on = None
 
 
 def upgrade():
+    # Separate calls: asyncpg rejects several commands in one execute().
     op.execute("""
         CREATE TABLE events (
             id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -16,9 +17,9 @@ def upgrade():
             user_id        text NOT NULL,
             attributes     jsonb NOT NULL DEFAULT '{}',
             received_at    timestamptz NOT NULL DEFAULT now()
-        );
-        CREATE INDEX ix_events_flag_key_type ON events (flag_key, event_type, received_at)
+        )
     """)
+    op.execute("CREATE INDEX ix_events_flag_key_type ON events (flag_key, event_type, received_at)")
 
 
 def downgrade():
