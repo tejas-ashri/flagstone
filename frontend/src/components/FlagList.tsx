@@ -1,50 +1,50 @@
 import type { FlagResponse } from "../types/flag";
-import { updateFlag, deleteFlag } from "../api/flags";
+import { Toggle } from "./Toggle";
 
 interface Props {
   flags: FlagResponse[];
-  onRefresh: () => void;
-  onSelect?: (key: string) => void;
+  selected: string | null;
+  onSelect: (key: string) => void;
+  onToggle: (flag: FlagResponse) => void;
 }
 
-export function FlagList({ flags, onRefresh, onSelect }: Props) {
-  const toggle = async (flag: FlagResponse) => {
-    await updateFlag(flag.key, { enabled: !flag.enabled });
-    onRefresh();
-  };
-  const remove = async (key: string) => {
-    if (confirm(`Delete flag "${key}"?`)) {
-      await deleteFlag(key);
-      onRefresh();
-    }
-  };
+function summary(flag: FlagResponse): string {
+  const parts = [];
+  if (flag.rules.length) parts.push(`${flag.rules.length} rule${flag.rules.length === 1 ? "" : "s"}`);
+  if (flag.rollout) parts.push(`${flag.rollout.percentage}% rollout`);
+  if (!parts.length) parts.push("default only");
+  return parts.join(" · ");
+}
+
+export function FlagList({ flags, selected, onSelect, onToggle }: Props) {
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-      <thead>
-        <tr>
-          {["Key", "Status", "Variations", "Updated", "Actions"].map(h => (
-            <th key={h} style={{ textAlign: "left", padding: "8px", borderBottom: "1px solid #ddd" }}>{h}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {flags.map(f => (
-          <tr key={f.key}>
-            <td style={{ padding: "8px" }}><code>{f.key}</code></td>
-            <td style={{ padding: "8px" }}>
-              <button onClick={() => toggle(f)} style={{ background: f.enabled ? "#22c55e" : "#ef4444", color: "#fff", border: "none", borderRadius: 4, padding: "4px 12px", cursor: "pointer" }}>
-                {f.enabled ? "ON" : "OFF"}
-              </button>
-            </td>
-            <td style={{ padding: "8px" }}>{f.variations.length} variations</td>
-            <td style={{ padding: "8px" }}>{new Date(f.updated_at).toLocaleString()}</td>
-            <td style={{ padding: "8px" }}>
-              <button onClick={() => onSelect?.(f.key)} style={{ color: "#3b82f6", background: "none", border: "none", cursor: "pointer", marginRight: 8 }}>Results</button>
-              <button onClick={() => remove(f.key)} style={{ color: "#ef4444", background: "none", border: "none", cursor: "pointer" }}>Delete</button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <ul className="flag-list">
+      {flags.map(f => (
+        <li key={f.key}>
+          <div
+            role="button"
+            tabIndex={0}
+            className={`flag-item${f.key === selected ? " selected" : ""}`}
+            onClick={() => onSelect(f.key)}
+            onKeyDown={e => {
+              if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                e.preventDefault();
+                onSelect(f.key);
+              }
+            }}
+          >
+            <div className="flag-item-text">
+              <code className="flag-key">{f.key}</code>
+              <span className="muted small">{summary(f)}</span>
+            </div>
+            <Toggle
+              checked={f.enabled}
+              onChange={() => onToggle(f)}
+              label={f.enabled ? `Turn ${f.key} off` : `Turn ${f.key} on`}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }

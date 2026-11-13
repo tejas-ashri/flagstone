@@ -1,34 +1,22 @@
-import type { FlagResponse } from "../types/flag";
+import type { FlagCreate, FlagResponse, FlagUpdate } from "../types/flag";
+import { jsonBody, request } from "./http";
 
 const BASE = "/api";
 
-export async function listFlags(): Promise<FlagResponse[]> {
-  const r = await fetch(`${BASE}/flags`);
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+const flagUrl = (key: string) => `${BASE}/flags/${encodeURIComponent(key)}`;
+
+export function listFlags(): Promise<FlagResponse[]> {
+  return request(`${BASE}/flags`);
 }
 
-export async function createFlag(data: Partial<FlagResponse>): Promise<FlagResponse> {
-  const r = await fetch(`${BASE}/flags`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+export function createFlag(data: FlagCreate): Promise<FlagResponse> {
+  return request(`${BASE}/flags`, jsonBody("POST", data));
 }
 
-export async function updateFlag(key: string, data: Partial<FlagResponse>): Promise<FlagResponse> {
-  const r = await fetch(`${BASE}/flags/${key}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+export function updateFlag(key: string, data: FlagUpdate): Promise<FlagResponse> {
+  return request(flagUrl(key), jsonBody("PUT", data));
 }
 
-export async function deleteFlag(key: string): Promise<void> {
-  const r = await fetch(`${BASE}/flags/${key}`, { method: "DELETE" });
-  if (!r.ok) throw new Error(`Failed to delete flag: ${r.status}`);
+export function deleteFlag(key: string): Promise<void> {
+  return request(flagUrl(key), { method: "DELETE" });
 }

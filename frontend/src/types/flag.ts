@@ -1,6 +1,8 @@
+export type RuleOperator = "equals" | "contains" | "gt" | "lt" | "in";
+
 export interface FlagRule {
   attribute: string;
-  operator: "equals" | "contains" | "gt" | "lt" | "in";
+  operator: RuleOperator;
   value: unknown;
   variation: number;
 }
@@ -19,6 +21,10 @@ export interface FlagResponse {
   rollout: FlagRollout | null;
   updated_at: string;
 }
+
+export type FlagCreate = Omit<FlagResponse, "updated_at">;
+
+export type FlagUpdate = Partial<Omit<FlagCreate, "key">>;
 
 export interface VariationResult {
   variation_index: number;

@@ -1,36 +1,121 @@
-import { useEffect, useState } from "react";
-import type { ExperimentResults as Results } from "../types/flag";
+import { useCallback, useEffect, useState } from "react";
 import { getExperimentResults } from "../api/analytics";
+import { messageOf } from "../api/http";
+import { formatValue } from "../lib/values";
+import type { FlagResponse, VariationResult } from "../types/flag";
 
-export function ExperimentResults({ flagKey }: { flagKey: string }) {
-  const [data, setData] = useState<Results | null>(null);
-  useEffect(() => {
-    getExperimentResults(flagKey).then(setData).catch(console.error);
+function rows(flag: FlagResponse, results: VariationResult[]): VariationResult[] {
+  // Show every configured variation, even with no events yet, plus any index
+  // that has events but is no longer configured.
+  const byIndex = new Map(results.map(r => [r.variation_index, r]));
+  flag.variations.forEach((_, i) => {
+    if (!byIndex.has(i)) {
+      byIndex.set(i, { variation_index: i, exposures: 0, conversions: 0, conversion_rate_pct: null });
+    }
+  });
+  return [...byIndex.values()].sort((a, b) => a.variation_index - b.variation_index);
+}
+
+function lift(rate: number | null, baseline: number | null): string {
+  if (rate == null || baseline == null || baseline === 0) return "—";
+  const pct = (100 * (rate - baseline)) / baseline;
+  return `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
+}
+
+export function ExperimentResults({ flag }: { flag: FlagResponse }) {
+  const [results, setResults] = useState<VariationResult[] | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const flagKey = flag.key;
+
+  const load = useCallback(() => {
+    setLoading(true);
+    return getExperimentResults(flagKey)
+      .then(d => {
+        setResults(d.variations);
+        setError("");
+      })
+      .catch(err => setError(messageOf(err)))
+      .finally(() => setLoading(false));
   }, [flagKey]);
-  if (!data) return <p>Loading...</p>;
-  if (!data.variations.length) return <p>No experiment data yet.</p>;
-  const best = data.variations.reduce((a, b) =>
-    (b.conversion_rate_pct ?? 0) > (a.conversion_rate_pct ?? 0) ? b : a
-  );
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (error && !results) {
+    return (
+      <div className="card">
+        <p className="error-text" role="alert">{error}</p>
+        <button type="button" className="btn" onClick={load}>Retry</button>
+      </div>
+    );
+  }
+  if (!results) return <p className="muted">Loading results…</p>;
+
+  const data = rows(flag, results);
+  const total = data.reduce((n, r) => n + r.exposures + r.conversions, 0);
+  const baseline = data.find(r => r.variation_index === flag.default_variation)?.conversion_rate_pct ?? null;
+  const topRate = Math.max(0, ...data.map(r => r.conversion_rate_pct ?? 0));
+  const leaders = data.filter(r => topRate > 0 && r.conversion_rate_pct === topRate);
+
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-      <thead>
-        <tr>
-          {["Variation", "Exposures", "Conversions", "Rate"].map(h => (
-            <th key={h} style={{ textAlign: "left", padding: "8px", borderBottom: "1px solid #ddd" }}>{h}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {data.variations.map(v => (
-          <tr key={v.variation_index} style={{ background: v === best ? "#f0fdf4" : undefined }}>
-            <td style={{ padding: "8px" }}>Variation {v.variation_index}{v === best ? " ★" : ""}</td>
-            <td style={{ padding: "8px" }}>{v.exposures}</td>
-            <td style={{ padding: "8px" }}>{v.conversions}</td>
-            <td style={{ padding: "8px" }}>{v.conversion_rate_pct != null ? `${v.conversion_rate_pct}%` : "—"}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="card">
+      <header className="card-head split">
+        <div>
+          <h3>Results by variation</h3>
+          <p className="muted small">
+            Exposures are recorded when the SDK evaluates this flag with <code>is_enabled</code>; conversions when
+            your app calls <code>track_conversion</code>.
+          </p>
+        </div>
+        <button type="button" className="btn" onClick={load} disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh"}
+        </button>
+      </header>
+      {error && <p className="error-text" role="alert">{error}</p>}
+      {total === 0 ? (
+        <p className="muted">No events yet. They appear here once an SDK client starts evaluating this flag.</p>
+      ) : (
+        <>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Variation</th>
+                  <th className="num">Exposures</th>
+                  <th className="num">Conversions</th>
+                  <th className="num">Conversion rate</th>
+                  <th className="num">vs default</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map(r => {
+                  const configured = r.variation_index < flag.variations.length;
+                  const isDefault = r.variation_index === flag.default_variation;
+                  return (
+                    <tr key={r.variation_index}>
+                      <td>
+                        <span className="index">{r.variation_index}</span>{" "}
+                        {configured ? <code>{formatValue(flag.variations[r.variation_index])}</code> : <span className="muted">removed</span>}
+                        {isDefault && <span className="badge">default</span>}
+                        {leaders.length === 1 && leaders[0] === r && <span className="badge good">leading</span>}
+                      </td>
+                      <td className="num">{r.exposures.toLocaleString()}</td>
+                      <td className="num">{r.conversions.toLocaleString()}</td>
+                      <td className="num">{r.conversion_rate_pct != null ? `${r.conversion_rate_pct}%` : "—"}</td>
+                      <td className="num">{isDefault ? "—" : lift(r.conversion_rate_pct, baseline)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="muted small">
+            Rates are raw counts with no significance test, so treat small samples with caution.
+          </p>
+        </>
+      )}
+    </div>
   );
 }

@@ -1,7 +1,6 @@
 import type { ExperimentResults } from "../types/flag";
+import { request } from "./http";
 
-export async function getExperimentResults(flagKey: string): Promise<ExperimentResults> {
-  const r = await fetch(`/api/experiments/${flagKey}/results`);
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+export function getExperimentResults(flagKey: string): Promise<ExperimentResults> {
+  return request(`/api/experiments/${encodeURIComponent(flagKey)}/results`);
 }
