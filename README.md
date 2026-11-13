@@ -17,6 +17,10 @@ The core workflow is simple: product or engineering teams create feature flags w
 - PostgreSQL-backed persistence with Alembic migrations.
 - Docker Compose setup for local backend and database onboarding.
 
+## Documentation
+
+In-depth docs live in [`docs/`](docs/README.md): [architecture](docs/architecture.md), [how it works](docs/how-it-works.md), [backend services](docs/backend-services.md), [authentication](docs/authentication.md), [frontend](docs/frontend.md) and [design decisions](docs/design-decisions.md).
+
 ## Repository Layout
 
 ```text
@@ -26,6 +30,7 @@ flagstone/
 │   ├── env.py                 Alembic migration environment
 │   ├── README                 Alembic notes
 │   └── script.py.mako         Migration file template
+├── docs/                      Architecture, design decisions and service-by-service docs
 ├── backend/
 │   ├── db/                    Async database session and SSE connection management
 │   ├── models/                SQLAlchemy ORM models
