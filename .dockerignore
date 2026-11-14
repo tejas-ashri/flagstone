@@ -1,0 +1,15 @@
+.superpowers/sdd/
+*.egg-info/
+.env
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+*.pyc
+.DS_Store
+dist/
+build/
+frontend/node_modules/
+frontend/dist/
+docs/
