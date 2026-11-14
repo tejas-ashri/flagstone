@@ -108,7 +108,9 @@ def test_close_cancels_flush_timer():
     client = FlagClient("sdk-key", base_url="http://localhost:8000", poll_interval=9999, flush_interval=9999)
     timer = client._flush_timer
     client.close()
-    # Timer should be cancelled (not alive)
+    # Timer should be cancelled. cancel() only signals the thread, so give it a
+    # moment to exit; a still-pending 9999 s timer would not finish within 1 s.
+    timer.join(timeout=1)
     assert not timer.is_alive()
 
 

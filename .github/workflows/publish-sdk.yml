@@ -24,8 +24,8 @@ jobs:
       matrix:
         python: ["3.10", "3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
       - run: pip install ./sdk pytest respx
@@ -36,8 +36,8 @@ jobs:
     name: Full test suite (incl. SDK/server parity)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]" -e ./sdk
@@ -47,8 +47,8 @@ jobs:
     needs: [test-sdk, test-all]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Check the tag matches the package version
