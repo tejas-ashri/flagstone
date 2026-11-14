@@ -1,6 +1,6 @@
 import pytest
 from backend.services.bucketing import bucket as backend_bucket, in_rollout as backend_in_rollout
-from sdk.bucketing import bucket as sdk_bucket, in_rollout as sdk_in_rollout
+from flagstone_sdk.bucketing import bucket as sdk_bucket, in_rollout as sdk_in_rollout
 
 CASES = [
     ("new-checkout", "u_1", None),

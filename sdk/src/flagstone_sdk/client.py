@@ -2,10 +2,10 @@ import threading
 
 import httpx
 
-from sdk.disk_cache import DiskCache
-from sdk.evaluator import evaluate
-from sdk.poller import Poller
-from sdk.stream_listener import StreamListener
+from .disk_cache import DiskCache
+from .evaluator import evaluate
+from .poller import Poller
+from .stream_listener import StreamListener
 
 
 class FlagClient:

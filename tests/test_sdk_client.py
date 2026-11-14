@@ -1,8 +1,8 @@
 import respx
 import httpx
 import threading
-from sdk.client import FlagClient
-from sdk.disk_cache import DiskCache
+from flagstone_sdk.client import FlagClient
+from flagstone_sdk.disk_cache import DiskCache
 
 FLAG_CONFIG = {
     "flags": {
@@ -31,7 +31,7 @@ def test_is_enabled_for_enterprise_user():
 @respx.mock
 def test_is_enabled_false_for_free_user_not_in_rollout():
     # Find a user who buckets >= 20 for "checkout-v2"
-    from sdk.bucketing import bucket
+    from flagstone_sdk.bucketing import bucket
     uid = next(f"u{i}" for i in range(1000) if bucket("checkout-v2", f"u{i}") >= 20)
     respx.get("http://localhost:8000/sdk/config").mock(
         return_value=httpx.Response(200, json=FLAG_CONFIG)

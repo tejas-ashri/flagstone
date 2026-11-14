@@ -1,4 +1,4 @@
-from sdk.bucketing import in_rollout
+from .bucketing import in_rollout
 
 def evaluate(flag: dict, user: dict) -> int:
     if not flag.get("enabled", True):

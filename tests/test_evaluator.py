@@ -1,6 +1,7 @@
 import pytest
 from backend.services.evaluator import evaluate as backend_evaluate
-from sdk.evaluator import evaluate as sdk_evaluate
+
+from flagstone_sdk.evaluator import evaluate as sdk_evaluate
 
 BASE_FLAG = {
     "key": "test-flag",

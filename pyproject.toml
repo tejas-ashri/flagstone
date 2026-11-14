@@ -29,7 +29,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-src = ["backend", "sdk", "tests"]
+src = ["backend", "sdk/src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
@@ -39,6 +39,8 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-q"
 
+# The server only. The SDK is a separate package (flagstone-sdk) in sdk/,
+# installed for development with `pip install -e ./sdk`.
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["backend*", "sdk*"]
+include = ["backend*"]

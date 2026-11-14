@@ -53,13 +53,16 @@ flagstone/
 │   ├── package.json           Frontend scripts and dependencies
 │   ├── vite.config.ts         Vite configuration
 │   └── tsconfig*.json         TypeScript configuration files
-├── sdk/
-│   ├── bucketing.py           Deterministic rollout bucketing logic
-│   ├── client.py              Python SDK client
-│   ├── disk_cache.py          Local SDK cache support
-│   ├── evaluator.py           Flag evaluation logic
-│   ├── poller.py              Periodic config refresh helper
-│   └── stream_listener.py     Server-Sent Events listener
+├── sdk/                       Python SDK, published separately as flagstone-sdk (MIT)
+│   ├── src/flagstone_sdk/
+│   │   ├── bucketing.py       Deterministic rollout bucketing logic
+│   │   ├── client.py          Python SDK client
+│   │   ├── disk_cache.py      Local SDK cache support
+│   │   ├── evaluator.py       Flag evaluation logic
+│   │   ├── poller.py          Periodic config refresh helper
+│   │   └── stream_listener.py Server-Sent Events listener
+│   ├── pyproject.toml         SDK package metadata
+│   └── README.md              SDK documentation, shown on PyPI
 ├── tests/                     Backend, SDK, analytics, SSE, and evaluator tests
 ├── alembic.ini                Alembic configuration
 ├── docker-compose.yml         Local API and PostgreSQL services
@@ -106,6 +109,7 @@ Install the Python package, apply migrations, then start the API. Migrations mus
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
+pip install -e ./sdk   # the SDK, needed by the tests
 cp .env.example .env   # then set DEV_LOGIN=true or OAuth credentials
 alembic upgrade head
 uvicorn backend.main:app --reload
@@ -125,8 +129,14 @@ In production, serve the built frontend (`npm run build`, output in `frontend/di
 
 ### 5. Use the Python SDK in a client application
 
+The SDK is a separate package with only `httpx` as a dependency, supporting Python 3.10 and newer. See [`sdk/README.md`](sdk/README.md) for its full documentation.
+
+```bash
+pip install flagstone-sdk
+```
+
 ```python
-from sdk.client import FlagClient
+from flagstone_sdk import FlagClient
 
 client = FlagClient(
     sdk_key="sdk-dev-key",  # or a key from the project's "SDK keys" page

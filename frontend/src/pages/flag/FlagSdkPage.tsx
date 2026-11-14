@@ -13,11 +13,13 @@ function snippet(flag: FlagResponse): string {
     ? `if client.is_enabled(${key}, user):\n    ...  # new behaviour`
     : `index = client.get_variation(${key}, user)  # index into the variations list`;
   return [
-    "from sdk.client import FlagClient",
+    "# pip install flagstone-sdk",
+    "from flagstone_sdk import FlagClient",
     "",
     "client = FlagClient(",
     '    sdk_key="<an SDK key of this project>",',
-    '    base_url="http://localhost:8000",',
+    // The UI is served by the API, so the page's own origin is the server URL.
+    `    base_url=${JSON.stringify(window.location.origin)},`,
     ")",
     "",
     `user = {${user}}`,
