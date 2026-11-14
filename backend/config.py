@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     session_ttl_hours: int = 24 * 7
 
+    # Built admin UI (`npm run build` output), served by the API so both share
+    # one origin. Relative paths are resolved from the working directory. If it
+    # doesn't exist, as in local development with Vite, the UI isn't served.
+    ui_dist_dir: str = "frontend/dist"
+
     github_client_id: str = ""
     github_client_secret: str = ""
     google_client_id: str = ""

@@ -1,7 +1,9 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 
 from backend.config import get_settings
 from backend.db.session import make_engine, session_factory
@@ -26,6 +28,36 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await engine.dispose()
 
 
+# Backend path prefixes. Unknown paths under these are API 404s, never the UI.
+API_PREFIXES = ("api", "auth", "sdk")
+# Vite puts a content hash in every file name under assets/, so they never change.
+IMMUTABLE = {"Cache-Control": "public, max-age=31536000, immutable"}
+NO_CACHE = {"Cache-Control": "no-cache"}
+
+
+def mount_ui(app: FastAPI, ui_dir: Path) -> None:
+    """Serves the built admin UI from ui_dir, so the UI and API share one origin.
+
+    Must be called after the API routers are included, so their paths match
+    first. Does nothing if the UI hasn't been built.
+    """
+    ui_dir = ui_dir.resolve()
+    index = ui_dir / "index.html"
+    if not index.is_file():
+        return
+
+    @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_ui(path: str) -> FileResponse:
+        if path.split("/", 1)[0] in API_PREFIXES:
+            raise HTTPException(status_code=404, detail="Not Found")
+        file = (ui_dir / path).resolve()
+        if path and file.is_file() and file.is_relative_to(ui_dir):
+            headers = IMMUTABLE if path.startswith("assets/") else NO_CACHE
+            return FileResponse(file, headers=headers)
+        # Any other path is a client-side route, such as /projects/1/flags.
+        return FileResponse(index, headers=NO_CACHE)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Flagstone", lifespan=lifespan)
     app.include_router(auth_router)
@@ -35,6 +67,7 @@ def create_app() -> FastAPI:
         # Original paths, kept working for the Default project.
         app.include_router(router, prefix="/api", include_in_schema=False)
     app.include_router(sdk_router)
+    mount_ui(app, Path(get_settings().ui_dist_dir))
     return app
 
 
