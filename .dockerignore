@@ -13,3 +13,9 @@ build/
 frontend/node_modules/
 frontend/dist/
 docs/
+# Not needed in the image; keeps the build context small.
+.git/
+tests/
+sdk/
+.env.*
+*.md
