@@ -1,10 +1,3 @@
-"""Authorization-code OAuth for GitHub, Google and Slack.
-
-Each provider only needs to yield a Profile with a verified email. Google and
-Slack are OpenID Connect providers; their userinfo endpoints are called with
-the access token over TLS instead of validating the id_token locally.
-"""
-
 from dataclasses import dataclass
 from urllib.parse import urlencode
 
